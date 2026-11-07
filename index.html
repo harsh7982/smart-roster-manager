@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Smart Roster Manager</title>
+<style>
+:root{--bg:#f6f7f9;--fg:#1d2330;--card:#fff;--bd:#d9dde5;--mut:#667;--W:#d7f0dd;--WO:#e3e6ec;--PH:#ffe9b8;--L:#ffd3d3;--CO:#d8e4ff;--bad:#c62828;--ok:#2e7d32;--warn:#b26a00;--ac:#2b5fd9;color-scheme:light dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#14171c;--fg:#e6e9ef;--card:#1d222b;--bd:#323946;--mut:#99a;--W:#1f4a2e;--WO:#2c323d;--PH:#5a4515;--L:#5c2626;--CO:#26407a;--bad:#ff8a80;--ok:#81c784;--warn:#ffb74d;--ac:#7fa6ff}}
+body{margin:0;padding:12px;background:var(--bg);color:var(--fg);font:14px system-ui,sans-serif}
+h1{font-size:18px;margin:0 12px 0 0}header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+button,select,input{font:inherit;padding:4px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--card);color:var(--fg)}
+button{cursor:pointer;background:var(--ac);color:#fff;border:0}button.s{background:var(--card);color:var(--fg);border:1px solid var(--bd)}
+.sc{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:8px;max-width:100%}
+.g{border-collapse:collapse;font-size:11px}.g th,.g td{border:1px solid var(--bd);padding:2px 3px;text-align:center;min-width:22px;cursor:default}
+.g th.n{text-align:left;position:sticky;left:0;background:var(--card);min-width:150px;white-space:nowrap}.g th.n small{color:var(--mut);margin-left:6px}
+.g th.ph{background:var(--PH)}.g th.su{background:var(--WO)}.g td{cursor:pointer}
+td.W{background:var(--W)}td.WO{background:var(--WO)}td.PH{background:var(--PH)}td.L{background:var(--L)}td.CO{background:var(--CO)}td.bad{background:var(--L);color:var(--bad);font-weight:700}
+.bad{color:var(--bad)}.ok{color:var(--ok)}.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;margin:8px 0}
+.it{padding:6px 0;border-bottom:1px solid var(--bd)}.tag{font-size:11px;padding:1px 6px;border-radius:9px;margin-right:6px;border:1px solid}
+.m{color:var(--bad)}.p{color:var(--warn)}.chip{display:inline-block;background:var(--WO);border-radius:10px;padding:0 6px;margin:1px;font-size:12px}.chip a{cursor:pointer;margin-left:4px}
+.ct{max-height:320px;overflow:auto}table.c td{padding:2px 6px;border-bottom:1px solid var(--bd);font-size:12px}small,.mut{color:var(--mut)}
+</style></head><body>
+<header><h1>Smart Roster Manager</h1>
+<input type="month" id="mon" value="2026-11" onchange="M=this.value;D.cov=[];gen();render()">
+<button onclick="D.cov=[];gen();render()">Generate roster</button>
+<select id="vt" onchange="V=[this.value,'']; render()"><option value="company">Company</option><option value="pod">Pod</option><option value="brand">Brand</option><option value="process">Process</option><option value="employee">Employee</option></select>
+<select id="vv" onchange="V[1]=this.value;render()"></select>
+<button class="s" onclick="demo()">Demo: sole employee on leave</button><button class="s" onclick="pub()">Publish</button></header>
+<div id="sum" class="card"></div><div id="pb" class="mut"></div><div id="info" class="mut"></div>
+<div class="sc"><div id="grid"></div></div>
+<p class="mut">W working · O weekly off / non-operating day · H public holiday · L leave · C comp-off. Click a cell to cycle it (W → O → L → C); every change is re-validated instantly.</p>
+<div class="card"><b>Conflicts and suggested fixes</b><div id="cf"></div></div>
+<details class="card"><summary><b>Configure data and rules</b> (no code changes needed)</summary><div id="cfg"></div></details>
+<script>
+const DN='Sun,Mon,Tue,Wed,Thu,Fri,Sat'.split(','),C={W:'W',WO:'O',PH:'H',L:'L',CO:'C'},CAL={A:'365 days',H:'Daily, holidays off',S:'Sun + holidays off'};
+let M='2026-11',ST={},V=['company',''];
+const NM='Aarav Mehta,Diya Patel,Kabir Singh,Ishita Rao,Rohan Gupta,Ananya Iyer,Vihaan Shah,Saanvi Nair,Arjun Reddy,Myra Kapoor,Reyansh Joshi,Kiara Desai,Aditya Verma,Navya Menon,Dev Malhotra,Tara Bose,Yash Chauhan,Riya Sethi,Karan Bhatt,Pooja Kulkarni,Neel Agarwal,Sneha Pillai,Manav Arora,Fatima Khan,Siddharth Jain,Lavanya Rao,Hemant Vora,Zoya Ali,Ishaan Dutta,Prisha Ghosh,Omkar Patil,Avni Saxena,Tanmay Rane'.split(',');
+const D={pods:[{n:'Pod Alpha',lead:'Anita Rao'},{n:'Pod Beta',lead:'Vikram Shah'},{n:'Pod Gamma',lead:'Meera Nair'}],hol:['2026-11-08','2026-11-24','2026-12-25'],brands:[],al:[],leaves:[{e:'E21',d:'2026-11-17',t:'L'},{e:'E29',d:'2026-11-12',t:'L'},{e:'E25',d:'2026-11-13',t:'CO'}],cov:[]};
+const PREF={E21:5,E24:3,E27:2,E32:1,E33:4};
+D.emps=NM.map((n,i)=>({id:'E'+(i+1),n,pod:D.pods[i%3].n,pref:PREF['E'+(i+1)]}));
+const PR=[['CS'],['CS','ACC'],['CS','ACC','NDR'],['CS','Retention'],['ACC','NDR']];
+'Zorbo,Kiwiko,Bloomly,Tandoori Tales,Urbane,Fitnest,Auric,Mintra,Saffron Co,Nomad Gear,Pixelpop,Terra Tea,Velvet Vault,Cleanse,Brewhaus,Glowkart,Orbit Toys,Kalaa,Dapper,Sunnyside'.split(',').forEach((n,i)=>{const ps=PR[i%5];D.brands.push({n,procs:ps.map(p=>({n:p,cal:'S',min:1}))});ps.forEach(p=>D.al.push({e:'E'+(i+1),b:n,p}))});
+const mb=(n,ps)=>D.brands.push({n,procs:ps.map(([p,cal,min,dmin,es])=>{es.forEach(e=>D.al.push({e:'E'+e,b:n,p}));return{n:p,cal,min,dmin}})});
+mb('Luma Skincare',[['CS','A',1,0,[21,22,23,10]],['ACC','S',1,0,[23]],['NDR','S',1,0,[22]]]);
+mb('Nimbus Home',[['CS','A',2,0,[24,25,26]],['Retention','S',1,0,[26]]]);
+mb('Veloura Fashion',[['CS','H',1,0,[27,28]],['NDR','A',1,0,[28,29]]]);
+mb('Pawsome Pets',[['CS','S',1,{6:2},[30,31]],['ACC','S',1,0,[31]]]);
+mb('Heliox Fitness',[['CS','A',1,0,[32,33]],['ACC','H',1,0,[32,33]]]);
+const pad=n=>String(n).padStart(2,'0'),dow=d=>new Date(d+'T00:00:00').getDay(),isH=d=>D.hol.includes(d),nm=id=>D.emps.find(e=>e.id==id)?.n;
+const dts=()=>{const[y,m]=M.split('-').map(Number);return[...Array(new Date(y,m,0).getDate())].map((_,i)=>`${M}-${pad(i+1)}`)};
+const wks=()=>{const w=[];dts().forEach(d=>{if(dow(d)==1||!w.length)w.push([]);w.at(-1).push(d)});return w};
+const op=(c,d)=>c=='A'||(!isH(d)&&(c=='H'||dow(d)!=0));
+const pr=(b,p)=>D.brands.find(x=>x.n==b).procs.find(x=>x.n==p);
+const need=(b,p,d)=>{const q=pr(b,p);return op(q.cal,d)?(q.dmin?.[dow(d)]??q.min):0};
+const myAl=e=>D.al.filter(a=>a.e==e),lv=(e,d)=>D.leaves.find(l=>l.e==e&&l.d==d);
+const have=(b,p,d)=>D.al.filter(a=>a.b==b&&a.p==p&&ST[a.e]?.[d]=='W').length+D.cov.filter(c=>c.b==b&&c.p==p&&c.d==d).length;
+// spare capacity if employee e were removed on day d (99 = nothing required of them that day)
+const sl=(e,d)=>Math.min(99,...myAl(e).map(a=>{const n=need(a.b,a.p,d);return n?have(a.b,a.p,d)-1-n:99}));
+// Generator: base status from operating calendars + leaves, then place weekly offs greedily on the day with most spare coverage
+function gen(ids){const ds=dts(),W=wks(),E=D.emps.filter(e=>!ids||ids.includes(e.id));
+ E.forEach(e=>{ST[e.id]={};ds.forEach(d=>{const l=lv(e.id,d);ST[e.id][d]=l?l.t:myAl(e.id).some(a=>need(a.b,a.p,d)>0)?'W':isH(d)&&dow(d)!=0?'PH':'WO'})});
+ const fe=new Map(E.map(e=>[e.id,ds.filter(d=>ST[e.id][d]=='W'&&sl(e.id,d)>=0).length]));
+ E.sort((a,b)=>fe.get(a.id)-fe.get(b.id)).forEach(e=>{let pv=-1;W.forEach(w=>{const x=w.find(d=>ST[e.id][d]=='WO');if(x){pv=dow(x);return}if(w.length<6)return;let best,bs=-1e9;
+  w.forEach(d=>{if(ST[e.id][d]!='W')return;const s=sl(e.id,d)*10+(e.pref==dow(d)?5:0)+(pv==dow(d)?3:0)-((dow(d)+ +e.id.slice(1))%7)*.01;if(s>bs){bs=s;best=d}});
+  if(best){ST[e.id][best]='WO';pv=dow(best)}})})}
+function val(){const ds=dts(),o=[];
+ D.brands.forEach(b=>b.procs.forEach(p=>ds.forEach(d=>{const n=need(b.n,p.n,d),h=have(b.n,p.n,d);if(h>=n)return;const al=D.al.filter(a=>a.b==b.n&&a.p==p.n);
+  o.push({k:'gap',s:1,b:b.n,p:p.n,d,msg:`${b.n} › ${p.n} on ${d} (${DN[dow(d)]}): needs ${n}, has ${h}. `+(al.length?'Unavailable: '+al.filter(a=>ST[a.e]?.[d]!='W').map(a=>`${nm(a.e)} (${ST[a.e]?.[d]})`).join(', '):'Nobody is assigned to this process.')})})));
+ D.emps.forEach(e=>{let r=0,miss=0;ds.forEach(d=>{r=ST[e.id]?.[d]=='W'?r+1:0;if(r==8)o.push({k:'rule',s:1,msg:`${e.n} works more than 7 days in a row, up to ${d}.`})});
+  wks().forEach(w=>{if(w.length<6)return;const x=w.filter(d=>ST[e.id]?.[d]=='WO');if(!x.length)o.push({k:'rule',s:1,msg:`${e.n} has no weekly off in the week of ${w[0]}.`});else if(e.pref!=null&&!x.some(d=>dow(d)==e.pref))miss++});
+  if(miss)o.push({k:'pref',s:0,msg:`${e.n}: preferred off day (${DN[e.pref]}) not honoured in ${miss} week(s). Coverage took priority.`})});
+ return o}
+function sug(c){if(c.k!='gap')return[];const s=[],w=wks().find(w=>w.includes(c.d));
+ D.al.filter(a=>a.b==c.b&&a.p==c.p&&ST[a.e][c.d]=='WO').forEach(a=>{const x=w.find(y=>y!=c.d&&ST[a.e][y]=='W'&&sl(a.e,y)>=0);if(x)s.push([`Move ${nm(a.e)}’s weekly off from ${c.d} to ${x}`,`mv('${a.e}','${c.d}','${x}')`])});
+ const lead=D.al.find(a=>a.b==c.b)?.e,pod=D.emps.find(e=>e.id==lead)?.pod;
+ D.emps.filter(e=>ST[e.id][c.d]=='W'&&!D.al.some(a=>a.e==e.id&&a.b==c.b&&a.p==c.p)&&sl(e.id,c.d)>=0&&!D.cov.some(v=>v.e==e.id&&v.d==c.d)).sort((a,b)=>(b.pod==pod)-(a.pod==pod)).slice(0,3)
+  .forEach(e=>s.push([`Borrow ${e.n} (${e.pod}) as cover; their own brands stay covered`,`cv('${e.id}','${c.b}','${c.p}','${c.d}')`]));
+ return s}
+const vE=()=>{const[t,v]=V;return t=='company'?D.emps:t=='pod'?D.emps.filter(e=>e.pod==v):t=='brand'?D.emps.filter(e=>D.al.some(a=>a.e==e.id&&a.b==v)):t=='process'?D.emps.filter(e=>D.al.some(a=>a.e==e.id&&a.b+'|'+a.p==v)):D.emps.filter(e=>e.id==v)};
+const covR=()=>{const[t,v]=V;return t=='brand'?D.brands.find(b=>b.n==v).procs.map(p=>[v,p.n]):t=='process'?[v.split('|')]:[]};
+function render(){const o=val(),m=o.filter(x=>x.s),w=o.filter(x=>!x.s),ds=dts(),T=V[0];
+ $('sum').innerHTML=`<b>${D.emps.length}</b> employees · <b>${D.brands.length}</b> brands (${D.brands.filter(b=>new Set(D.al.filter(a=>a.b==b.n).map(a=>a.e)).size==1).length} single-resource) · <span class="${m.length?'bad':'ok'}">${m.length} mandatory issue(s)</span> · ${w.length} warning(s)`;
+ const opts={company:[],pod:D.pods.map(p=>[p.n,p.n]),brand:D.brands.map(b=>[b.n,b.n]),process:D.brands.flatMap(b=>b.procs.map(p=>[b.n+'|'+p.n,b.n+' › '+p.n])),employee:D.emps.map(e=>[e.id,e.n])}[T];
+ if(!V[1]&&opts.length)V[1]=opts[0][0];
+ $('vt').value=T;$('vv').innerHTML=opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');$('vv').style.display=opts.length?'':'none';$('vv').value=V[1];
+ $('info').textContent=T=='pod'?'Pod lead: '+D.pods.find(p=>p.n==V[1]).lead:T=='employee'?'Assignments: '+myAl(V[1]).map(a=>a.b+' › '+a.p).join(', '):'';
+ let h=`<table class="g"><tr><th class="n">Employee</th>${ds.map(d=>`<th class="${isH(d)?'ph':dow(d)==0?'su':''}">${d.slice(8)}<br>${DN[dow(d)][0]}</th>`).join('')}<th>W</th></tr>`;
+ vE().forEach(e=>{h+=`<tr><th class="n" title="${myAl(e.id).map(a=>a.b+' › '+a.p).join(', ')}">${e.n}<small>${e.pod.slice(4)}</small></th>`+ds.map(d=>{const s=ST[e.id]?.[d]||'';return`<td class="${s}" onclick="tg('${e.id}','${d}')">${C[s]||''}</td>`}).join('')+`<td>${ds.filter(d=>ST[e.id]?.[d]=='W').length}</td></tr>`});
+ covR().forEach(([b,p])=>{h+=`<tr><th class="n">${b} › ${p} (have/need)</th>`+ds.map(d=>{const n=need(b,p,d),k=have(b,p,d);return`<td class="${k<n?'bad':''}" style="cursor:default">${n?k+'/'+n:'·'}</td>`}).join('')+'<td></td></tr>'});
+ if(T=='company')h+=`<tr><th class="n">Coverage gaps</th>${ds.map(d=>{const g=o.filter(x=>x.d==d).length;return`<td class="${g?'bad':''}" style="cursor:default">${g||''}</td>`}).join('')}<td></td></tr>`;
+ $('grid').innerHTML=h+'</table>';
+ $('cf').innerHTML=(o.slice(0,40).map(c=>`<div class="it"><span class="tag ${c.s?'m':'p'}">${c.s?'Mandatory':'Preference'}</span>${c.msg}${sug(c).map(([t,f])=>`<div><button class="s" onclick="${f}">Apply</button> ${t}</div>`).join('')||(c.k=='gap'?'<div class="mut">No safe backup found; needs a manager decision (hire, shift process hours or reduce the requirement).</div>':'')}</div>`).join('')||'<div class="ok">No conflicts. Roster is valid.</div>')+(o.length>40?`<p class="mut">+${o.length-40} more</p>`:'');
+ cfg()}
+function tg(e,d){const n={W:'WO',WO:'L',L:'CO',CO:'W',PH:'W'}[ST[e][d]];D.leaves=D.leaves.filter(l=>!(l.e==e&&l.d==d));if(n=='L'||n=='CO')D.leaves.push({e,d,t:n});ST[e][d]=n;render()}
+function mv(e,a,b){ST[e][a]='W';ST[e][b]='WO';render()}
+function cv(e,b,p,d){D.cov.push({e,b,p,d});render()}
+function pub(){const m=val().filter(x=>x.s).length;$('pb').textContent=m?`Cannot publish: ${m} mandatory issue(s) still open.`:'Roster published (in-memory demo state).'}
+function demo(){M='2026-11';$('mon').value=M;D.cov=[];D.leaves=D.leaves.filter(l=>l.e!='E3');gen();D.leaves.push({e:'E3',d:'2026-11-11',t:'L'});ST.E3['2026-11-11']='L';V=['brand','Bloomly'];$('pb').textContent='Change applied: Kabir Singh (sole resource for Bloomly: CS, ACC, NDR) is on leave on 11 Nov. Review the flagged gaps below.';render()}
+const ids=(b,p)=>D.al.filter(a=>a.b==b&&(!p||a.p==p)).map(a=>a.e);
+function ru(i,j,k,v){const b=D.brands[i],p=b.procs[j];if(k=='dmin'){p.dmin={};v.split(',').forEach(x=>{const[a,c]=x.split(':');if(c!=null&&a!=='')p.dmin[+a]=+c})}else p[k]=k=='min'?+v:v;gen(ids(b.n,p.n));render()}
+function rm(k){const a=D.al.splice(k,1)[0];gen([a.e]);render()}
+function ad(b,p,e){if(!e||D.al.some(a=>a.e==e&&a.b==b&&a.p==p))return;D.al.push({e,b,p});gen([e]);render()}
+function ae(){const n=$('en').value.trim();if(!n)return;const id='E'+(Math.max(...D.emps.map(e=>+e.id.slice(1)))+1);D.emps.push({id,n,pod:$('ep').value});gen([id]);render()}
+function ab(){const n=$('bn').value.trim();if(!n)return;D.brands.push({n,procs:[{n:$('bp').value.trim()||'CS',cal:$('bc').value,min:+$('bm').value||1}]});render()}
+function addL(){const e=$('le').value,d=$('ld').value,t=$('lt').value;if(!e||!d)return;D.leaves=D.leaves.filter(l=>!(l.e==e&&l.d==d));D.leaves.push({e,d,t});if(ST[e]?.[d])ST[e][d]=t;render()}
+function sh(){D.hol=$('hl').value.split(',').map(s=>s.trim()).filter(Boolean);gen();render()}
+function cfg(){const eo=D.emps.map(e=>`<option value="${e.id}">${e.n}</option>`).join(''),co=Object.entries(CAL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+ const rows=D.brands.flatMap((b,i)=>b.procs.map((p,j)=>`<tr><td>${b.n}</td><td>${p.n}</td><td><select onchange="ru(${i},${j},'cal',this.value)">${co.replace(`value="${p.cal}"`,`value="${p.cal}" selected`)}</select></td><td><input type="number" min="0" value="${p.min}" style="width:48px" onchange="ru(${i},${j},'min',this.value)"></td><td><input value="${Object.entries(p.dmin||{}).map(([k,v])=>k+':'+v)}" placeholder="6:2" style="width:60px" onchange="ru(${i},${j},'dmin',this.value)"></td><td>${D.al.map((a,k)=>a.b==b.n&&a.p==p.n?`<span class="chip">${nm(a.e)}<a onclick="rm(${k})">×</a></span>`:'').join('')}<select onchange="ad('${b.n}','${p.n}',this.value)"><option value="">+ add</option>${eo}</select></td></tr>`));
+ $('cfg').innerHTML=`<p class="mut">Rules per process: calendar, minimum staff, day-specific minimum (weekday number:min, 0 = Sunday), assigned employees. Changes re-plan only the affected employees.</p><div class="ct"><table class="c"><tr><td>Brand</td><td>Process</td><td>Calendar</td><td>Min</td><td>Day min</td><td>Employees</td></tr>${rows.join('')}</table></div>
+ <p>Public holidays: <input id="hl" value="${D.hol.join(',')}" style="width:340px"> <button onclick="sh()">Save and rebuild</button></p>
+ <p>Add employee: <input id="en" placeholder="Name"> <select id="ep">${D.pods.map(p=>`<option>${p.n}</option>`).join('')}</select> <button onclick="ae()">Add</button></p>
+ <p>Add brand: <input id="bn" placeholder="Brand"> <input id="bp" placeholder="Process" style="width:90px"> <select id="bc">${co}</select> min <input id="bm" type="number" value="1" style="width:48px"> <button onclick="ab()">Add</button></p>
+ <p>Add leave / comp-off: <select id="le">${eo}</select> <input id="ld" type="date"> <select id="lt"><option value="L">Leave</option><option value="CO">Comp-off</option></select> <button onclick="addL()">Apply</button></p>
+ <p class="mut"><b>Assumptions:</b> weeks run Mon–Sun, each employee needs one weekly off per full week and no more than 7 consecutive working days; a non-operating day (e.g. Sunday for a Sun-off process) counts as the weekly off; public holidays are off only if none of the employee’s processes operate; coverage is mandatory, preferred off days are soft; data is held in memory.</p>`}
+const $=id=>document.getElementById(id);
+gen();render();
+</script></body></html>
